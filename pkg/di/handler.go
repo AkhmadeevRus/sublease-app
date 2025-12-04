@@ -15,7 +15,7 @@ type Handler struct {
 
 func NewHandler(services *Service) *Handler {
 	return &Handler{
-		AuthHandler:     auth.NewAuthHandler(services.AuthService),
+		AuthHandler:     auth.NewAuthHandler(services.AuthService, services.EmailSmtpService),
 		PropertyHandler: property.NewPropertyHandler(services.PropertyService),
 		SearchHandler:   search.NewSearchHandler(services.SearchService),
 	}
@@ -27,19 +27,21 @@ func (h *Handler) InitRoutes() *gin.Engine {
 	{
 		auth.POST("/sign-up", h.AuthHandler.SignUp)
 		auth.POST("/sign-in", h.AuthHandler.SignIn)
+		auth.POST("/confirm-email", h.AuthHandler.ConfirmEmail)
+		auth.POST("/resend-confirm-email", h.AuthHandler.ResendConfirmEmail)
 	}
 	api := router.Group("/api", h.AuthHandler.UserIdentity)
 	{
 		property := api.Group("/property")
 		{
 			property.POST("/", h.PropertyHandler.CreateProperty)
-			property.GET("/", h.PropertyHandler.GetMyProperties)
 			property.PUT("/:id", h.PropertyHandler.UpdateProperty)
 			property.DELETE("/:id", h.PropertyHandler.DeleteProperty)
 		}
 		search := api.Group("/search")
 		{
 			search.GET("/", h.SearchHandler.GetAllProperties)
+			search.GET("/:id", h.SearchHandler.GetPropertyById)
 			search.POST("/", h.SearchHandler.SearchByFilters)
 		}
 	}

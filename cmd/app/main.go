@@ -1,12 +1,17 @@
 package main
 
 import (
+	"fmt"
 	"os"
+	"strconv"
+	"time"
 
 	"github.com/AkhmadeevRus/sublease-app/pkg/di"
+	emailsmtp "github.com/AkhmadeevRus/sublease-app/pkg/email_smtp"
 	"github.com/AkhmadeevRus/sublease-app/pkg/server"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
+	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
@@ -33,7 +38,41 @@ func main() {
 		logrus.Fatalf("failed to initialize db: %s", err.Error())
 	}
 
-	repos := di.NewRepository(db)
+	dbNum, err := strconv.Atoi(os.Getenv("REDIS_DB"))
+	if err != nil {
+		logrus.Fatalf("err while create connection to db: %s", err.Error())
+	}
+
+	redisOption := redis.Options{
+		Addr:     fmt.Sprintf("%s:%s", os.Getenv("REDIS_HOST"), os.Getenv("REDIS_PORT")),
+		Password: os.Getenv("REDIS_PASSWORD"),
+		DB:       dbNum,
+	}
+
+	cacheDb, err := server.NewRedisDb(&redisOption)
+	if err != nil {
+		logrus.Fatalf("err while create connection to db: %s", err.Error())
+	}
+
+	codeExp, err := time.ParseDuration(os.Getenv("CODE_EXP"))
+	if err != nil {
+		logrus.Fatalf("Error while create connection to db: %s", err.Error())
+	}
+
+	codeLength, err := strconv.Atoi(os.Getenv("CODE_LENGTH"))
+	if err != nil {
+		logrus.Fatalf("Error while create connection to db: %s", err.Error())
+	}
+
+	emailCfg := emailsmtp.NewEmailCfg(
+		os.Getenv("OWNER_EMAIL"),
+		os.Getenv("OWNER_PASSWORD"),
+		os.Getenv("SMTP_ADDR"),
+		codeLength,
+		codeExp,
+	)
+
+	repos := di.NewRepository(db, cacheDb, emailCfg)
 	services := di.NewService(repos)
 	handlers := di.NewHandler(services)
 	srv := new(server.Server)
