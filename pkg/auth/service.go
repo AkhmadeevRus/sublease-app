@@ -13,10 +13,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const (
-	TokeknTTL = 12 * time.Hour
-)
-
 type tokenClaims struct {
 	jwt.StandardClaims
 	UserId uuid.UUID `json:"user_id"`
@@ -65,9 +61,13 @@ func (s *AuthService) GenerateToken(username, password string) (string, error) {
 		return "", fmt.Errorf("email not confirmed")
 	}
 
+	tokenTTL, err := time.ParseDuration(os.Getenv("TOKEN_TTL"))
+	if err != nil {
+		return "", fmt.Errorf("err while parse token in time.Duration")
+	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, &tokenClaims{
 		jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(TokeknTTL).Unix(),
+			ExpiresAt: time.Now().Add(tokenTTL).Unix(),
 			IssuedAt:  time.Now().Unix(),
 		},
 		user.Id,

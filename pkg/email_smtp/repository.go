@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	sq "github.com/Masterminds/squirrel"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -48,14 +49,29 @@ func NewEmailSmtpRepository(db *sqlx.DB, cfg *EmailCfg) *EmailSmtpRepository {
 
 func (r *EmailSmtpRepository) CheckEmailConfirm(email string) (bool, error) {
 	var status bool
-	query := `SELECT confirmed_email FROM users WHERE email = $1`
-	err := r.db.Get(&status, query, email)
+	sql, args, err := sq.Select("confirmed_email").
+		From("users").
+		Where(sq.Eq{"email": email}).
+		ToSql()
+	if err != nil {
+		return false, err
+	}
+	err = r.db.Get(&status, sql, args...)
+	if err != nil {
+		return false, err
+	}
 	return status, err
 }
 
 func (r *EmailSmtpRepository) ConfirmEmail(email string) error {
-	query := `UPDATE users SET confirmed_email='t' WHERE email=$1 AND confirmed_email='f'`
-	res, err := r.db.Exec(query, email)
+	sql, args, err := sq.Update("users").
+		Set("confirmed_email", true).
+		Where(sq.Eq{"email": email}).
+		ToSql()
+	if err != nil {
+		return err
+	}
+	res, err := r.db.Exec(sql, args...)
 	n, _ := res.RowsAffected()
 	if n == 0 && err == nil {
 		return errors.New("alredy confirmed")

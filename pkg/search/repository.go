@@ -1,10 +1,8 @@
 package search
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/AkhmadeevRus/sublease-app/pkg/property"
+	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 )
@@ -25,12 +23,16 @@ func NewSearchRepository(db *sqlx.DB) *SearchRepository {
 
 func (r *SearchRepository) GetAllProperties() ([]property.Property, error) {
 	var properties []property.Property
-	query := `SELECT id, user_id, title, description, address, price, area, rooms_count, 
-			bathrooms_count, property_type, deal_type, material_type, 
-			gas, electricity, internet, sewerage, plumbing,
-			renovation, floor, land_area, floors
-			FROM properties`
-	err := r.db.Select(&properties, query)
+	sql, args, err := sq.Select("id", "user_id", "title", "description", "address", "price", "area",
+		"rooms_count", "bathrooms_count", "property_type", "deal_type", "material_type",
+		"gas", "electricity", "internet", "sewerage", "plumbing",
+		"renovation", "floor", "land_area", "floors").
+		From("properties").
+		ToSql()
+	if err != nil {
+		return nil, err
+	}
+	err = r.db.Select(&properties, sql, args)
 	if err != nil {
 		return nil, err
 	}
@@ -39,13 +41,17 @@ func (r *SearchRepository) GetAllProperties() ([]property.Property, error) {
 
 func (r *SearchRepository) GetPropertyById(id uuid.UUID) (property.Property, error) {
 	var outProperty property.Property
-	query := `SELECT id, user_id, title, description, address, price, area, rooms_count, 
-			bathrooms_count, property_type, deal_type, material_type, 
-			gas, electricity, internet, sewerage, plumbing,
-			renovation, floor, land_area, floors
-			FROM properties
-			WHERE id = $1`
-	err := r.db.Get(&outProperty, query, id)
+	sql, args, err := sq.Select("id", "user_id", "title", "description", "address", "price", "area",
+		"rooms_count", "bathrooms_count", "property_type", "deal_type", "material_type",
+		"gas", "electricity", "internet", "sewerage", "plumbing",
+		"renovation", "floor", "land_area", "floors").
+		From("properties").
+		Where(sq.Eq{"id": id}).
+		ToSql()
+	if err != nil {
+		return property.Property{}, err
+	}
+	err = r.db.Get(&outProperty, sql, args...)
 	if err != nil {
 		return property.Property{}, err
 	}
@@ -53,106 +59,77 @@ func (r *SearchRepository) GetPropertyById(id uuid.UUID) (property.Property, err
 }
 
 func (r *SearchRepository) SearchByFilters(filter PropertyFilter) ([]property.Property, error) {
-	setValues := make([]string, 0)
-	args := make([]interface{}, 0)
-	argsId := 1
+	query := sq.Select("id", "user_id", "title", "description", "address", "price", "area",
+		"rooms_count", "bathrooms_count", "property_type", "deal_type", "material_type",
+		"gas", "electricity", "internet", "sewerage", "plumbing",
+		"renovation", "floor", "land_area", "floors",
+	).From("properties")
 
 	if filter.MinPrice != nil {
-		setValues = append(setValues, fmt.Sprintf("price >= $%d", argsId))
-		args = append(args, *filter.MinPrice)
-		argsId++
+		query = query.Where(sq.GtOrEq{"price": *filter.MinPrice})
 	}
 	if filter.MaxPrice != nil {
-		setValues = append(setValues, fmt.Sprintf("price <= $%d", argsId))
-		args = append(args, *filter.MaxPrice)
-		argsId++
+		query = query.Where(sq.LtOrEq{"price": *filter.MaxPrice})
 	}
-	if filter.Area != nil {
-		setValues = append(setValues, fmt.Sprintf("area >= $%d", argsId))
-		args = append(args, *filter.Area)
-		argsId++
+	if filter.MinArea != nil {
+		query = query.Where(sq.GtOrEq{"area": *filter.MinArea})
+	}
+	if filter.MaxArea != nil {
+		query = query.Where(sq.LtOrEq{"area": *filter.MaxArea})
 	}
 	if filter.RoomsCount != nil {
-		setValues = append(setValues, fmt.Sprintf("rooms_count = $%d", argsId))
-		args = append(args, *filter.RoomsCount)
-		argsId++
-	}
-	if filter.BathroomsCount != nil {
-		setValues = append(setValues, fmt.Sprintf("bathrooms_count = $%d", argsId))
-		args = append(args, *filter.BathroomsCount)
-		argsId++
+		query = query.Where(sq.Eq{"rooms_count": *filter.RoomsCount})
 	}
 	if filter.PropertyType != nil {
-		setValues = append(setValues, fmt.Sprintf("property_type = $%d", argsId))
-		args = append(args, *filter.PropertyType)
-		argsId++
+		query = query.Where(sq.Eq{"property_type": *filter.PropertyType})
 	}
 	if filter.DealType != nil {
-		setValues = append(setValues, fmt.Sprintf("deal_type = $%d", argsId))
-		args = append(args, *filter.DealType)
-		argsId++
+		query = query.Where(sq.Eq{"deal_type": *filter.DealType})
+	}
+	if filter.BathroomsCount != nil {
+		query = query.Where(sq.Eq{"bathrooms_count": *filter.BathroomsCount})
 	}
 	if filter.Material != nil {
-		setValues = append(setValues, fmt.Sprintf("material_type = $%d", argsId))
-		args = append(args, *filter.Material)
-		argsId++
+		query = query.Where(sq.Eq{"material_type": *filter.Material})
 	}
 	if filter.Gas != nil {
-		setValues = append(setValues, fmt.Sprintf("gas = $%d", argsId))
-		args = append(args, *filter.Gas)
-		argsId++
+		query = query.Where(sq.Eq{"gas": *filter.Gas})
 	}
 	if filter.Electricity != nil {
-		setValues = append(setValues, fmt.Sprintf("electricity = $%d", argsId))
-		args = append(args, *filter.Electricity)
-		argsId++
+		query = query.Where(sq.Eq{"electricity": *filter.Electricity})
 	}
 	if filter.Internet != nil {
-		setValues = append(setValues, fmt.Sprintf("internet = $%d", argsId))
-		args = append(args, *filter.Internet)
-		argsId++
+		query = query.Where(sq.Eq{"internet": *filter.Internet})
 	}
 	if filter.Sewerage != nil {
-		setValues = append(setValues, fmt.Sprintf("sewerage = $%d", argsId))
-		args = append(args, *filter.Sewerage)
-		argsId++
+		query = query.Where(sq.Eq{"sewerage": *filter.Sewerage})
 	}
 	if filter.Plumbing != nil {
-		setValues = append(setValues, fmt.Sprintf("plumbing = $%d", argsId))
-		args = append(args, *filter.Plumbing)
-		argsId++
+		query = query.Where(sq.Eq{"plumbing": *filter.Plumbing})
 	}
 	if filter.Renovation != nil {
-		setValues = append(setValues, fmt.Sprintf("renovation = $%d", argsId))
-		args = append(args, *filter.Renovation)
-		argsId++
+		query = query.Where(sq.Eq{"renovation": *filter.Renovation})
 	}
 	if filter.Floor != nil {
-		setValues = append(setValues, fmt.Sprintf("floor = $%d", argsId))
-		args = append(args, *filter.Floor)
-		argsId++
+		query = query.Where(sq.Eq{"floor": *filter.Floor})
 	}
-	if filter.LandArea != nil {
-		setValues = append(setValues, fmt.Sprintf("land_area >= $%d", argsId))
-		args = append(args, *filter.LandArea)
-		argsId++
+	if filter.MinLandArea != nil {
+		query = query.Where(sq.GtOrEq{"land_area": *filter.MinLandArea})
+	}
+	if filter.MaxLandArea != nil {
+		query = query.Where(sq.LtOrEq{"land_area": *filter.MaxLandArea})
 	}
 	if filter.Floors != nil {
-		setValues = append(setValues, fmt.Sprintf("floors = $%d", argsId))
-		args = append(args, *filter.Floors)
-		argsId++
+		query = query.Where(sq.Eq{"floors": *filter.Floors})
 	}
-	query := `SELECT id, user_id, title, description, address, price, area, rooms_count, 
-			bathrooms_count, property_type, deal_type, material_type, 
-			gas, electricity, internet, sewerage, plumbing,
-			renovation, floor, land_area, floors
-			FROM properties`
 
-	if len(setValues) > 0 {
-		query += " WHERE " + strings.Join(setValues, " AND ")
+	sql, args, err := query.ToSql()
+	if err != nil {
+		return nil, err
 	}
+
 	var properties []property.Property
-	err := r.db.Select(&properties, query, args...)
+	err = r.db.Select(&properties, sql, args...)
 	if err != nil {
 		return nil, err
 	}

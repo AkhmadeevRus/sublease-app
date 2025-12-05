@@ -3,6 +3,7 @@ package auth
 import (
 	"fmt"
 
+	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 )
@@ -22,8 +23,14 @@ func NewAuthRepository(db *sqlx.DB) *AuthRepository {
 
 func (r *AuthRepository) CreateUser(user User) error {
 	var usernameCount int
-	query := "SELECT COUNT(*) FROM users WHERE username = $1"
-	err := r.db.Get(&usernameCount, query, user.Username)
+	sql, args, err := sq.Select("count(*)").
+		From("users").
+		Where(sq.Eq{"username": user.Username}).
+		ToSql()
+	if err != nil {
+		return err
+	}
+	err = r.db.Get(&usernameCount, sql, args...)
 	if err != nil {
 		return err
 	}
@@ -32,8 +39,14 @@ func (r *AuthRepository) CreateUser(user User) error {
 	}
 
 	var emailCount int
-	query = "SELECT COUNT(*) FROM users WHERE email = $1"
-	err = r.db.Get(&emailCount, query, user.Email)
+	sql, args, err = sq.Select("count(*)").
+		From("users").
+		Where(sq.Eq{"email": user.Email}).
+		ToSql()
+	if err != nil {
+		return err
+	}
+	err = r.db.Get(&emailCount, sql, args...)
 	if err != nil {
 		return err
 	}
@@ -42,17 +55,26 @@ func (r *AuthRepository) CreateUser(user User) error {
 	}
 
 	user.Id = uuid.New()
-	query = `INSERT INTO users (id, name, username, password, phone, role, email) values ($1, $2, $3, $4, $5, $6, $7)`
-	_, err = r.db.Exec(query, user.Id, user.Name, user.Username, user.Password, user.Phone, user.Role, user.Email)
+	sql, args, err = sq.Insert("users").
+		Columns("id", "name", "username", "password", "phone", "role", "email").
+		Values(user.Id, user.Name, user.Username, user.Password, user.Phone, user.Role, user.Email).
+		ToSql()
 	if err != nil {
 		return err
 	}
-	return nil
+	_, err = r.db.Exec(sql, args...)
+	return err
 }
 
 func (r *AuthRepository) GetUser(username, password string) (User, error) {
 	var user User
-	query := "SELECT id FROM users WHERE username=$1 AND password=$2"
-	err := r.db.Get(&user, query, username, password)
+	sql, args, err := sq.Select("id").
+		From("users").
+		Where(sq.Eq{"username": username, "password": password}).
+		ToSql()
+	if err != nil {
+		return User{}, err
+	}
+	err = r.db.Get(&user, sql, args...)
 	return user, err
 }

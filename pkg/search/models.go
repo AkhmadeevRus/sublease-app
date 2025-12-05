@@ -9,7 +9,8 @@ import (
 type PropertyFilter struct {
 	MinPrice       *int                   `form:"min_price"`
 	MaxPrice       *int                   `form:"max_price"`
-	Area           *int                   `form:"area"`
+	MinArea        *int                   `form:"min_area"`
+	MaxArea        *int                   `form:"max_area"`
 	RoomsCount     *int                   `form:"rooms_count"`
 	BathroomsCount *int                   `form:"bathrooms_count"`
 	PropertyType   *property.PropertyType `form:"property_type"`
@@ -24,8 +25,9 @@ type PropertyFilter struct {
 	Renovation *property.RenovationType `form:"renovation"`
 	Floor      *int                     `form:"floor"`
 	// for house
-	LandArea *int `form:"land_area"`
-	Floors   *int `form:"floors"`
+	MinLandArea *int `form:"min_land_area"`
+	MaxLandArea *int `form:"max_land_area"`
+	Floors      *int `form:"floors"`
 }
 
 func (p *PropertyFilter) Validate() error {
@@ -38,8 +40,17 @@ func (p *PropertyFilter) Validate() error {
 	if p.MaxPrice != nil && *p.MaxPrice < 0 {
 		return errors.New("max_price must be positive")
 	}
-	if p.Area != nil && *p.Area <= 0 {
-		return errors.New("area must be positive")
+	if p.MinArea != nil && *p.MinArea <= 0 {
+		return errors.New("min_area must be positive")
+	}
+	if p.MaxArea != nil && *p.MaxArea <= 0 {
+		return errors.New("max_area must be positive")
+	}
+	if p.MinLandArea != nil && *p.MinLandArea <= 0 {
+		return errors.New("min_land_area must be positive")
+	}
+	if p.MaxLandArea != nil && *p.MaxLandArea <= 0 {
+		return errors.New("max_land_area must be positive")
 	}
 	if p.RoomsCount != nil && *p.RoomsCount <= 0 {
 		return errors.New("rooms_count must be positive")

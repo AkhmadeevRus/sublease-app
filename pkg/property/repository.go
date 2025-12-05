@@ -2,8 +2,8 @@ package property
 
 import (
 	"fmt"
-	"strings"
 
+	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 )
@@ -24,177 +24,115 @@ func NewPropertyRepository(db *sqlx.DB) *PropertyRepository {
 
 func (r *PropertyRepository) CreateProperty(property Property, userId uuid.UUID) error {
 	var id uuid.UUID
-	query := `INSERT INTO properties (
-			user_id, title, description, address, price, area, rooms_count, 
-			bathrooms_count, property_type, deal_type, material_type, 
-			gas, electricity, internet, sewerage, plumbing,
-			renovation, floor, land_area, floors)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)RETURNING id`
+	sql, args, err := sq.Insert("properties").
+		Columns("user_id", "title", "description", "address", "price", "area",
+			"rooms_count", "bathrooms_count", "property_type", "deal_type", "material_type",
+			"gas", "electricity", "internet", "sewerage", "plumbing",
+			"renovation", "floor", "land_area", "floors").
+		Values(userId, property.Title,
+			property.Description, property.Address, property.Price,
+			property.Area, property.RoomsCount, property.BathroomsCount,
+			property.PropertyType, property.DealType, property.Material,
+			property.Gas, property.Electricity, property.Internet,
+			property.Sewerage, property.Plumbing, property.Renovation,
+			property.Floor, property.LandArea, property.Floors).
+		Suffix("RETURNING id").ToSql()
 
-	row := r.db.QueryRow(
-		query,
-		userId,
-		property.Title,
-		property.Description,
-		property.Address,
-		property.Price,
-		property.Area,
-		property.RoomsCount,
-		property.BathroomsCount,
-		property.PropertyType,
-		property.DealType,
-		property.Material,
-		property.Gas,
-		property.Electricity,
-		property.Internet,
-		property.Sewerage,
-		property.Plumbing,
-		property.Renovation,
-		property.Floor,
-		property.LandArea,
-		property.Floors,
-	)
-
-	if err := row.Scan(&id); err != nil {
+	if err != nil {
 		return err
+	}
+
+	err = r.db.QueryRow(sql, args...).Scan(&id)
+	if err != nil {
+		return fmt.Errorf("failed to exec query: %w", err)
 	}
 
 	return nil
 }
 
 func (r *PropertyRepository) DeleteProperty(userId, id uuid.UUID) error {
-	query := `DELETE FROM properties WHERE user_id = $1 and id = $2`
-	_, err := r.db.Exec(query, userId, id)
-	return err
+	sql, args, err := sq.Delete("properties").
+		Where(sq.Eq{"id": id, "user_id": userId}).
+		ToSql()
+	if err != nil {
+		return err
+	}
+
+	_, err = r.db.Exec(sql, args...)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (r *PropertyRepository) UpdateProperty(userId, id uuid.UUID, input PropertyUpdate) error {
-	setValues := make([]string, 0)
-	args := make([]interface{}, 0)
-	argId := 1
-
+	query := sq.Update("properties")
 	if input.Title != nil {
-		setValues = append(setValues, fmt.Sprintf("title=$%d", argId))
-		args = append(args, *input.Title)
-		argId++
+		query = query.Set("title", *input.Title)
 	}
-
 	if input.Description != nil {
-		setValues = append(setValues, fmt.Sprintf("description=$%d", argId))
-		args = append(args, *input.Description)
-		argId++
+		query = query.Set("description", *input.Description)
 	}
-
 	if input.Address != nil {
-		setValues = append(setValues, fmt.Sprintf("address=$%d", argId))
-		args = append(args, *input.Address)
-		argId++
+		query = query.Set("address", *input.Address)
 	}
-
 	if input.Price != nil {
-		setValues = append(setValues, fmt.Sprintf("price=$%d", argId))
-		args = append(args, *input.Price)
-		argId++
+		query = query.Set("price", *input.Price)
 	}
-
 	if input.Area != nil {
-		setValues = append(setValues, fmt.Sprintf("area=$%d", argId))
-		args = append(args, *input.Area)
-		argId++
+		query = query.Set("area", *input.Area)
 	}
-
 	if input.RoomsCount != nil {
-		setValues = append(setValues, fmt.Sprintf("rooms_count=$%d", argId))
-		args = append(args, *input.RoomsCount)
-		argId++
+		query = query.Set("rooms_count", *input.RoomsCount)
 	}
-
 	if input.BathroomsCount != nil {
-		setValues = append(setValues, fmt.Sprintf("bathrooms_count=$%d", argId))
-		args = append(args, *input.BathroomsCount)
-		argId++
+		query = query.Set("bathrooms_count", *input.BathroomsCount)
 	}
-
 	if input.PropertyType != nil {
-		setValues = append(setValues, fmt.Sprintf("property_type=$%d", argId))
-		args = append(args, *input.PropertyType)
-		argId++
+		query = query.Set("property_type", *input.PropertyType)
 	}
-
 	if input.DealType != nil {
-		setValues = append(setValues, fmt.Sprintf("deal_type=$%d", argId))
-		args = append(args, *input.DealType)
-		argId++
+		query = query.Set("deal_type", *input.DealType)
 	}
-
 	if input.Material != nil {
-		setValues = append(setValues, fmt.Sprintf("material_type=$%d", argId))
-		args = append(args, *input.Material)
-		argId++
+		query = query.Set("material_type", *input.Material)
 	}
-
 	if input.Gas != nil {
-		setValues = append(setValues, fmt.Sprintf("gas=$%d", argId))
-		args = append(args, *input.Gas)
-		argId++
+		query = query.Set("gas", *input.Gas)
 	}
-
 	if input.Electricity != nil {
-		setValues = append(setValues, fmt.Sprintf("electricity=$%d", argId))
-		args = append(args, *input.Electricity)
-		argId++
+		query = query.Set("electricity", *input.Electricity)
 	}
-
 	if input.Internet != nil {
-		setValues = append(setValues, fmt.Sprintf("internet=$%d", argId))
-		args = append(args, *input.Internet)
-		argId++
+		query = query.Set("internet", *input.Internet)
 	}
-
 	if input.Sewerage != nil {
-		setValues = append(setValues, fmt.Sprintf("sewerage=$%d", argId))
-		args = append(args, *input.Sewerage)
-		argId++
+		query = query.Set("sewerage", *input.Sewerage)
 	}
-
 	if input.Plumbing != nil {
-		setValues = append(setValues, fmt.Sprintf("plumbing=$%d", argId))
-		args = append(args, *input.Plumbing)
-		argId++
+		query = query.Set("plumbing", *input.Plumbing)
 	}
-
 	if input.Renovation != nil {
-		setValues = append(setValues, fmt.Sprintf("renovation=$%d", argId))
-		args = append(args, *input.Renovation)
-		argId++
+		query = query.Set("renovation", *input.Renovation)
 	}
-
-	if input.LandArea != nil {
-		setValues = append(setValues, fmt.Sprintf("land_area=$%d", argId))
-		args = append(args, *input.LandArea)
-		argId++
-	}
-
 	if input.Floor != nil {
-		setValues = append(setValues, fmt.Sprintf("floor=$%d", argId))
-		args = append(args, *input.Floor)
-		argId++
+		query = query.Set("floor", *input.Floor)
 	}
-
+	if input.LandArea != nil {
+		query = query.Set("land_area", *input.LandArea)
+	}
 	if input.Floors != nil {
-		setValues = append(setValues, fmt.Sprintf("floors=$%d", argId))
-		args = append(args, *input.Floors)
-		argId++
+		query = query.Set("floors", *input.Floors)
+	}
+	sql, args, err := query.Where(sq.Eq{"id": id, "user_id": userId}).ToSql()
+	if err != nil {
+		return err
 	}
 
-	if len(setValues) == 0 {
-		return fmt.Errorf("no fields to update")
+	_, err = r.db.Exec(sql, args...)
+	if err != nil {
+		return err
 	}
 
-	setQuery := strings.Join(setValues, ", ")
-
-	query := fmt.Sprintf("UPDATE properties SET %s WHERE id=$%d AND user_id=$%d", setQuery, argId, argId+1)
-	args = append(args, id, userId)
-	_, err := r.db.Exec(query, args...)
-	return err
+	return nil
 }
