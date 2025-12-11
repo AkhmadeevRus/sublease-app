@@ -14,15 +14,11 @@ type Service struct {
 	EmailSmtpService emailsmtp.IEmailSmtpService
 }
 
-func NewService(repos *Repository) *Service {
-	emailSmtpService := emailsmtp.NewEmailSmtpService(
-		repos.EmailSmtpRepository,
-		repos.EmailSmtpCacheRepository,
-	)
+func NewService(repos *Repository, emailSmtpService *emailsmtp.EmailSmtpService) *Service {
 	return &Service{
 		AuthService:      auth.NewAuthService(repos.AuthRepository, emailSmtpService),
 		PropertyService:  property.NewPropertyService(repos.PropertyRepository),
 		SearchService:    search.NewSearchService(repos.SearchRepository),
-		EmailSmtpService: emailsmtp.NewEmailSmtpService(repos.EmailSmtpRepository, repos.EmailSmtpCacheRepository),
+		EmailSmtpService: emailSmtpService,
 	}
 }

@@ -3,6 +3,7 @@ package auth
 import (
 	"net/http"
 
+	"github.com/AkhmadeevRus/sublease-app/pkg/apperror"
 	emailsmtp "github.com/AkhmadeevRus/sublease-app/pkg/email_smtp"
 	"github.com/gin-gonic/gin"
 )
@@ -13,6 +14,8 @@ type IAuthHandler interface {
 	UserIdentity(c *gin.Context)
 	ConfirmEmail(c *gin.Context)
 	ResendConfirmEmail(c *gin.Context)
+	RequestPasswordReset(c *gin.Context)
+	UpdatePassword(c *gin.Context)
 }
 
 type AuthHandler struct {
@@ -28,13 +31,13 @@ func (h *AuthHandler) SignUp(c *gin.Context) {
 	var input User
 
 	if err := c.BindJSON(&input); err != nil {
-		NewErrorResponse(c, http.StatusBadRequest, err.Error())
+		apperror.NewErrorResponse(c, apperror.NewBadRequestError(err.Error(), "INVALID_INPUT"))
 		return
 	}
 
 	err := h.service.CreateUser(input)
 	if err != nil {
-		NewErrorResponse(c, http.StatusInternalServerError, err.Error())
+		apperror.NewErrorResponse(c, err)
 		return
 	}
 
@@ -52,13 +55,13 @@ func (h *AuthHandler) SignIn(c *gin.Context) {
 	var input signInInput
 
 	if err := c.BindJSON(&input); err != nil {
-		NewErrorResponse(c, http.StatusBadRequest, err.Error())
+		apperror.NewErrorResponse(c, apperror.NewBadRequestError(err.Error(), "INVALID_INPUT"))
 		return
 	}
 
 	token, err := h.service.GenerateToken(input.Username, input.Password)
 	if err != nil {
-		NewErrorResponse(c, http.StatusUnauthorized, err.Error())
+		apperror.NewErrorResponse(c, err)
 		return
 	}
 
@@ -75,13 +78,13 @@ type confirmCodeInput struct {
 func (h *AuthHandler) ConfirmEmail(c *gin.Context) {
 	var input confirmCodeInput
 	if err := c.BindJSON(&input); err != nil {
-		NewErrorResponse(c, http.StatusBadRequest, err.Error())
+		apperror.NewErrorResponse(c, apperror.NewBadRequestError(err.Error(), "INVALID_INPUT"))
 		return
 	}
 
 	err := h.emailService.ConfirmEmail(input.Email, input.Code)
 	if err != nil {
-		NewErrorResponse(c, http.StatusBadRequest, err.Error())
+		apperror.NewErrorResponse(c, err)
 		return
 	}
 
@@ -97,13 +100,65 @@ type ResendConfirmEmailInput struct {
 func (h *AuthHandler) ResendConfirmEmail(c *gin.Context) {
 	var input ResendConfirmEmailInput
 	if err := c.BindJSON(&input); err != nil {
-		NewErrorResponse(c, http.StatusBadRequest, err.Error())
+		apperror.NewErrorResponse(c, apperror.NewBadRequestError(err.Error(), "INVALID_INPUT"))
 		return
 	}
 
 	err := h.emailService.SendConfirmEmailMessage(input.Email)
 	if err != nil {
-		NewErrorResponse(c, http.StatusBadRequest, err.Error())
+		apperror.NewErrorResponse(c, err)
+	}
+
+	c.JSON(http.StatusOK, map[string]interface{}{
+		"status": "ok",
+	})
+}
+
+type requestPasswordResetInput struct {
+	Email string `json:"email" binding:"required"`
+}
+
+func (h *AuthHandler) RequestPasswordReset(c *gin.Context) {
+	var input requestPasswordResetInput
+	if err := c.BindJSON(&input); err != nil {
+		apperror.NewErrorResponse(c, apperror.NewBadRequestError(err.Error(), "INVALID_INPUT"))
+		return
+	}
+
+	err := h.emailService.SendPasswordResetEmail(input.Email)
+	if err != nil {
+		apperror.NewErrorResponse(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, map[string]interface{}{
+		"status": "ok",
+	})
+}
+
+type ResetPasswordInput struct {
+	Email       string `json:"email" binding:"required"`
+	Code        string `json:"code" binding:"required"`
+	NewPassword string `json:"password" binding:"required"`
+}
+
+func (h *AuthHandler) UpdatePassword(c *gin.Context) {
+	var input ResetPasswordInput
+	if err := c.BindJSON(&input); err != nil {
+		apperror.NewErrorResponse(c, apperror.NewBadRequestError(err.Error(), "INVALID_INPUT"))
+		return
+	}
+
+	trueCode, err := h.emailService.GetPasswordResetCode(input.Email)
+	if err != nil {
+		apperror.NewErrorResponse(c, err)
+	} else if trueCode != input.Code {
+
+	}
+
+	err := h.service.UpdatePassword(input.Email, input.Code, input.NewPassword)
+	if err != nil {
+		apperror.NewErrorResponse(c, err)
+		return
 	}
 
 	c.JSON(http.StatusOK, map[string]interface{}{

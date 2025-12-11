@@ -73,7 +73,11 @@ func main() {
 	)
 
 	repos := di.NewRepository(db, cacheDb, emailCfg)
-	services := di.NewService(repos)
+	emailSmtpService := emailsmtp.NewEmailSmtpService(
+		repos.EmailSmtpRepository,
+		repos.EmailSmtpCacheRepository,
+	)
+	services := di.NewService(repos, emailSmtpService)
 	handlers := di.NewHandler(services)
 	srv := new(server.Server)
 	if err := srv.Run(viper.GetString("port"), handlers.InitRoutes()); err != nil {

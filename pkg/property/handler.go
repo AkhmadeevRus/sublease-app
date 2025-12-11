@@ -3,6 +3,7 @@ package property
 import (
 	"net/http"
 
+	"github.com/AkhmadeevRus/sublease-app/pkg/apperror"
 	"github.com/AkhmadeevRus/sublease-app/pkg/auth"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -25,19 +26,19 @@ func NewPropertyHandler(service IPropertyService) *PropertyHandler {
 func (h *PropertyHandler) CreateProperty(c *gin.Context) {
 	userId, err := auth.GetUserId(c)
 	if err != nil {
-		auth.NewErrorResponse(c, http.StatusInternalServerError, err.Error())
+		apperror.NewErrorResponse(c, err)
 		return
 	}
 
 	var input Property
 	if err := c.BindJSON(&input); err != nil {
-		auth.NewErrorResponse(c, http.StatusBadRequest, err.Error())
+		apperror.NewErrorResponse(c, apperror.NewBadRequestError(err.Error(), "INVALID_INPUT"))
 		return
 	}
 
 	err = h.service.CreateProperty(input, userId)
 	if err != nil {
-		auth.NewErrorResponse(c, http.StatusInternalServerError, err.Error())
+		apperror.NewErrorResponse(c, err)
 		return
 	}
 
@@ -53,24 +54,24 @@ type GetMyPropertiesResponse struct {
 func (h *PropertyHandler) DeleteProperty(c *gin.Context) {
 	userId, err := auth.GetUserId(c)
 	if err != nil {
-		auth.NewErrorResponse(c, http.StatusInternalServerError, err.Error())
+		apperror.NewErrorResponse(c, err)
 		return
 	}
 
 	id := c.Param("id")
 	if id == "" {
-		auth.NewErrorResponse(c, http.StatusBadRequest, "invalid id param")
+		apperror.NewErrorResponse(c, apperror.NewBadRequestError("invalid id param", "INVALID_PARAM"))
 		return
 	}
 	propertyId, err := uuid.Parse(id)
 	if err != nil {
-		auth.NewErrorResponse(c, http.StatusBadRequest, err.Error())
+		apperror.NewErrorResponse(c, apperror.NewInternalError(err))
 		return
 	}
 
 	err = h.service.DeleteProperty(userId, propertyId)
 	if err != nil {
-		auth.NewErrorResponse(c, http.StatusInternalServerError, err.Error())
+		apperror.NewErrorResponse(c, err)
 		return
 	}
 
@@ -82,29 +83,29 @@ func (h *PropertyHandler) DeleteProperty(c *gin.Context) {
 func (h *PropertyHandler) UpdateProperty(c *gin.Context) {
 	userId, err := auth.GetUserId(c)
 	if err != nil {
-		auth.NewErrorResponse(c, http.StatusInternalServerError, err.Error())
+		apperror.NewErrorResponse(c, err)
 		return
 	}
 
 	id := c.Param("id")
 	if id == "" {
-		auth.NewErrorResponse(c, http.StatusBadRequest, "invalid id param")
+		apperror.NewErrorResponse(c, apperror.NewBadRequestError("invalid id param", "INVALID_PARAM"))
 		return
 	}
 	propertyId, err := uuid.Parse(id)
 	if err != nil {
-		auth.NewErrorResponse(c, http.StatusBadRequest, err.Error())
+		apperror.NewErrorResponse(c, apperror.NewInternalError(err))
 		return
 	}
 
 	var input PropertyUpdate
 	if err := c.BindJSON(&input); err != nil {
-		auth.NewErrorResponse(c, http.StatusBadRequest, err.Error())
+		apperror.NewErrorResponse(c, apperror.NewBadRequestError(err.Error(), "INVALID_INPUT"))
 		return
 	}
 	err = h.service.UpdateProperty(userId, propertyId, input)
 	if err != nil {
-		auth.NewErrorResponse(c, http.StatusInternalServerError, err.Error())
+		apperror.NewErrorResponse(c, err)
 		return
 	}
 

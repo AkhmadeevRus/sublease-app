@@ -7,6 +7,8 @@ import (
 )
 
 type PropertyFilter struct {
+	Title          *string                `json:"title"`
+	Description    *string                `json:"description"`
 	MinPrice       *int                   `form:"min_price"`
 	MaxPrice       *int                   `form:"max_price"`
 	MinArea        *int                   `form:"min_area"`

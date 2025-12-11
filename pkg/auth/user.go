@@ -11,10 +11,10 @@ const (
 
 type User struct {
 	Id               uuid.UUID `json:"-" db:"id"`
-	Username         string    `json:"username" binding:"required"`
-	Name             string    `json:"name" binding:"required"`
-	Password         string    `json:"password" binding:"required"`
-	Phone            string    `json:"phone" binding:"required"`
+	Username         string    `json:"username" binding:"required" db:"username"`
+	Name             string    `json:"name" binding:"required" db:"name"`
+	Password         string    `json:"password" binding:"required" db:"password"`
+	Phone            string    `json:"phone" binding:"required" db:"phone"`
 	Email            string    `json:"email" binding:"required" db:"email"`
 	IsEmailConfirmed bool      `json:"-" db:"confirmed_email"`
 	Role             UserRole  `json:"role" binding:"required" db:"role"`

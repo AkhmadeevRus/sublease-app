@@ -2,15 +2,14 @@ package auth
 
 import (
 	"crypto/sha1"
-	"errors"
 	"fmt"
 	"os"
 	"time"
 
+	"github.com/AkhmadeevRus/sublease-app/pkg/apperror"
 	emailsmtp "github.com/AkhmadeevRus/sublease-app/pkg/email_smtp"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
 )
 
 type tokenClaims struct {
@@ -22,6 +21,8 @@ type IAuthService interface {
 	CreateUser(user User) error
 	GenerateToken(username, password string) (string, error)
 	ParseToken(accessToken string) (uuid.UUID, error)
+	GetUserByEmail(email string) (User, error)
+	UpdatePassword(email, code, newPassword string) error
 }
 
 type AuthService struct {
@@ -40,9 +41,8 @@ func (s *AuthService) CreateUser(user User) error {
 		return err
 	}
 	if err := s.emailService.SendConfirmEmailMessage(user.Email); err != nil {
-		logrus.Errorf("err while send confirm email message:%s", err.Error())
+		return err
 	}
-
 	return nil
 }
 
@@ -58,12 +58,12 @@ func (s *AuthService) GenerateToken(username, password string) (string, error) {
 	}
 
 	if !isConfirmed {
-		return "", fmt.Errorf("email not confirmed")
+		return "", apperror.NewUnauthorizedError("email not confirmed", "EMAIL_NOT_CONFIRMED")
 	}
 
 	tokenTTL, err := time.ParseDuration(os.Getenv("TOKEN_TTL"))
 	if err != nil {
-		return "", fmt.Errorf("err while parse token in time.Duration")
+		return "", apperror.NewInternalError(fmt.Errorf("filed to parse duration(tokenTTL):%w", err))
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, &tokenClaims{
 		jwt.StandardClaims{
@@ -79,18 +79,18 @@ func (s *AuthService) GenerateToken(username, password string) (string, error) {
 func (s *AuthService) ParseToken(accessToken string) (uuid.UUID, error) {
 	token, err := jwt.ParseWithClaims(accessToken, &tokenClaims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, errors.New("invalid signin method")
+			return nil, apperror.NewUnauthorizedError("invalid signing method", "INVALID_TOKEN")
 		}
 
 		return []byte(os.Getenv("JWT_SECRET")), nil
 	})
 	if err != nil {
-		return uuid.Nil, err
+		return uuid.Nil, apperror.NewUnauthorizedError(err.Error(), "INVALID_TOKEN")
 	}
 
 	claims, ok := token.Claims.(*tokenClaims)
 	if !ok {
-		return uuid.Nil, errors.New("token claims are not of type *tokenClaims")
+		return uuid.Nil, apperror.NewUnauthorizedError("invalid token claims", "INVALID_TOKEN")
 	}
 
 	return claims.UserId, nil
@@ -101,4 +101,13 @@ func (s *AuthService) generatePasswordHash(password string) string {
 	hash.Write([]byte(password))
 
 	return fmt.Sprintf("%x", hash.Sum([]byte(os.Getenv("PASSWORD_SALT"))))
+}
+
+func (s *AuthService) GetUserByEmail(email string) (User, error) {
+	return s.repo.GetUserByEmail(email)
+}
+
+func (s *AuthService) UpdatePassword(email, code, password string) error {
+	passwordHash := s.generatePasswordHash(password)
+	return s.repo.UpdatePassword(email, passwordHash)
 }

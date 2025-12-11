@@ -1,6 +1,9 @@
 package search
 
 import (
+	"fmt"
+
+	"github.com/AkhmadeevRus/sublease-app/pkg/apperror"
 	"github.com/AkhmadeevRus/sublease-app/pkg/property"
 	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
@@ -28,13 +31,14 @@ func (r *SearchRepository) GetAllProperties() ([]property.Property, error) {
 		"gas", "electricity", "internet", "sewerage", "plumbing",
 		"renovation", "floor", "land_area", "floors").
 		From("properties").
+		PlaceholderFormat(sq.Dollar).
 		ToSql()
 	if err != nil {
-		return nil, err
+		return nil, apperror.NewInternalError(fmt.Errorf("err in build sql query"))
 	}
-	err = r.db.Select(&properties, sql, args)
+	err = r.db.Select(&properties, sql, args...)
 	if err != nil {
-		return nil, err
+		return nil, apperror.NewInternalError(fmt.Errorf("failed to select query:%w", err))
 	}
 	return properties, nil
 }
@@ -47,13 +51,14 @@ func (r *SearchRepository) GetPropertyById(id uuid.UUID) (property.Property, err
 		"renovation", "floor", "land_area", "floors").
 		From("properties").
 		Where(sq.Eq{"id": id}).
+		PlaceholderFormat(sq.Dollar).
 		ToSql()
 	if err != nil {
-		return property.Property{}, err
+		return property.Property{}, apperror.NewInternalError(fmt.Errorf("err in build sql query"))
 	}
 	err = r.db.Get(&outProperty, sql, args...)
 	if err != nil {
-		return property.Property{}, err
+		return property.Property{}, apperror.NewInternalError(fmt.Errorf("failed to get query:%w", err))
 	}
 	return outProperty, nil
 }
@@ -65,6 +70,12 @@ func (r *SearchRepository) SearchByFilters(filter PropertyFilter) ([]property.Pr
 		"renovation", "floor", "land_area", "floors",
 	).From("properties")
 
+	if filter.Title != nil {
+		query = query.Where(sq.Eq{"title": *filter.Title})
+	}
+	if filter.Description != nil {
+		query = query.Where(sq.Eq{"description": *filter.Description})
+	}
 	if filter.MinPrice != nil {
 		query = query.Where(sq.GtOrEq{"price": *filter.MinPrice})
 	}
@@ -123,15 +134,15 @@ func (r *SearchRepository) SearchByFilters(filter PropertyFilter) ([]property.Pr
 		query = query.Where(sq.Eq{"floors": *filter.Floors})
 	}
 
-	sql, args, err := query.ToSql()
+	sql, args, err := query.PlaceholderFormat(sq.Dollar).ToSql()
 	if err != nil {
-		return nil, err
+		return nil, apperror.NewInternalError(fmt.Errorf("err in build sql query"))
 	}
 
 	var properties []property.Property
 	err = r.db.Select(&properties, sql, args...)
 	if err != nil {
-		return nil, err
+		return nil, apperror.NewInternalError(fmt.Errorf("failed to select query:%w", err))
 	}
 
 	return properties, nil

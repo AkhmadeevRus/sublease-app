@@ -3,6 +3,7 @@ package property
 import (
 	"fmt"
 
+	"github.com/AkhmadeevRus/sublease-app/pkg/apperror"
 	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -36,15 +37,17 @@ func (r *PropertyRepository) CreateProperty(property Property, userId uuid.UUID)
 			property.Gas, property.Electricity, property.Internet,
 			property.Sewerage, property.Plumbing, property.Renovation,
 			property.Floor, property.LandArea, property.Floors).
-		Suffix("RETURNING id").ToSql()
+		Suffix("RETURNING id").
+		PlaceholderFormat(sq.Dollar).
+		ToSql()
 
 	if err != nil {
-		return err
+		return apperror.NewInternalError(fmt.Errorf("err in build sql query"))
 	}
 
 	err = r.db.QueryRow(sql, args...).Scan(&id)
 	if err != nil {
-		return fmt.Errorf("failed to exec query: %w", err)
+		return apperror.NewInternalError(fmt.Errorf("failed to exec query: %w", err))
 	}
 
 	return nil
@@ -53,14 +56,15 @@ func (r *PropertyRepository) CreateProperty(property Property, userId uuid.UUID)
 func (r *PropertyRepository) DeleteProperty(userId, id uuid.UUID) error {
 	sql, args, err := sq.Delete("properties").
 		Where(sq.Eq{"id": id, "user_id": userId}).
+		PlaceholderFormat(sq.Dollar).
 		ToSql()
 	if err != nil {
-		return err
+		return apperror.NewInternalError(fmt.Errorf("err in build sql query"))
 	}
 
 	_, err = r.db.Exec(sql, args...)
 	if err != nil {
-		return err
+		return apperror.NewInternalError(fmt.Errorf("err to exec query: %w", err))
 	}
 	return nil
 }
@@ -124,14 +128,16 @@ func (r *PropertyRepository) UpdateProperty(userId, id uuid.UUID, input Property
 	if input.Floors != nil {
 		query = query.Set("floors", *input.Floors)
 	}
-	sql, args, err := query.Where(sq.Eq{"id": id, "user_id": userId}).ToSql()
+	sql, args, err := query.Where(sq.Eq{"id": id, "user_id": userId}).
+		PlaceholderFormat(sq.Dollar).
+		ToSql()
 	if err != nil {
-		return err
+		return apperror.NewInternalError(fmt.Errorf("err in build sql query"))
 	}
 
 	_, err = r.db.Exec(sql, args...)
 	if err != nil {
-		return err
+		return apperror.NewInternalError(fmt.Errorf("err to exec query: %w", err))
 	}
 
 	return nil
